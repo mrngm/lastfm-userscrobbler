@@ -3,6 +3,7 @@ import sys
 import signal
 import time
 import datetime
+from calendar import timegm
 
 to_scrobble = True # or not to scrobble
 sleeptime = 10
@@ -32,33 +33,37 @@ else:
 			timestamp = time.mktime(d.timetuple())
 			firstMsg = True
 			while True:
-				if isinstance(t, LastFM.pylast.Track):
-					if to_scrobble == True:
-						LastFM.network.update_now_playing(t.get_artist(), t.get_title(True))
-					if firstMsg == True:
-						print str(d) + " /",
-						print "Now playing: " + str(t)
-						firstMsg = False
-					t = user.get_now_playing()
+				try:
 					if isinstance(t, LastFM.pylast.Track):
-						if t == lastKnownTrack:
-							time.sleep(sleeptime)
+						if to_scrobble == True:
+							LastFM.network.update_now_playing(t.get_artist(), t.get_title(True))
+						if firstMsg == True:
+							print str(d) + " /",
+							print "Now playing: " + str(t)
+							firstMsg = False
+						t = user.get_now_playing()
+						if isinstance(t, LastFM.pylast.Track):
+							if t == lastKnownTrack:
+								time.sleep(sleeptime)
+							else:
+								if to_scrobble == True:
+									LastFM.network.scrobble(lastKnownTrack.get_artist(), lastKnownTrack.get_title(), int(timestamp))
+									print str(datetime.datetime.utcnow()) + " /",
+									print "Scrobbled: " + str(lastKnownTrack) + " from " + str(d)
+								d = datetime.datetime.utcnow()
+								timestamp = timegm(d.timetuple())
+								lastKnownTrack = t
+								firstMsg = True
 						else:
-							if to_scrobble == True:
-								LastFM.network.scrobble(lastKnownTrack.get_artist(), lastKnownTrack.get_title(True), int(timestamp))
-								print str(datetime.datetime.utcnow()) + " /",
-								print "Scrobbled: " + str(lastKnownTrack) + " from " + str(d)
-							d = datetime.datetime.utcnow()
-							timestamp = time.mktime(d.timetuple())
-							lastKnownTrack = t
 							firstMsg = True
 					else:
-						firstMsg = True
-				else:
-					if firstMsg == False:
-						time.sleep(sleeptime)
-					else:
-						print "Not playing anything at the moment"
-						firstMsg = False
+						if firstMsg == False:
+							time.sleep(sleeptime)
+							t = user.get_now_playing()
+						else:
+							print "Not playing anything at the moment"
+							firstMsg = False
+				except LastFM.pylast.WSError as e:
+					print "An error occurred: " + str(e)
 		# Catch Ctrl-C
 		signal.pause()
